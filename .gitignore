@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+*.log
+bench/results.local.json
+# 本地配置与密钥：只提交 .env.example
+.env
+.env.*
+!.env.example

@@ -1,0 +1,11 @@
+# IronGate 没有第三方运行时依赖：只使用 Python 标准库（>= 3.10）。
+#
+# 本文件不需要 pip install 任何包；保留它是为了让人一眼确认
+# "解压即可运行、不需要联网装依赖"。
+#
+# 自检与打包同样只用标准库：
+#   python -m unittest discover -s tests   # 单元测试（unittest）
+#   python -m irongate eval                # 基准评测
+#   http.server / argparse / zipfile       # 服务 / 命令行 / 打包
+#
+# 若后续要用真实流量做阈值再校准，可选用 numpy（本仓库不依赖它）。

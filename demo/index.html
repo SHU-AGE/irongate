@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IronGate（铁闸）· 提示注入信息流护栏</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #0f1218; --panel: #161b24; --line: #232a36; --text: #e6e9ef;
+    --muted: #8b95a7; --accent: #4f8cff;
+    --allow: #2fbf71; --sanitize: #d9a521; --quarantine: #b46bdc; --block: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  header {
+    padding: 18px 28px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header .tag { color: var(--muted); font-size: 12.5px; }
+  .wrap { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(380px, 1fr); gap: 18px; padding: 18px 28px 40px; }
+  @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 12px; }
+  textarea {
+    width: 100%; min-height: 190px; resize: vertical; background: #0c1016;
+    color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px; font: 13.5px/1.65 ui-monospace, Consolas, monospace;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  label { color: var(--muted); font-size: 12.5px; }
+  select, input[type=text] {
+    background: #0c1016; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; font-size: 13px;
+  }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+    padding: 8px 16px; font-size: 13.5px; cursor: pointer;
+  }
+  button.ghost { background: #1e2634; color: var(--text); }
+  button:hover { filter: brightness(1.1); }
+  .examples { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .examples button { background: #1a2230; color: #b9c4d6; font-size: 12px; padding: 5px 10px; }
+  .verdict-head { display: flex; align-items: center; gap: 12px; }
+  .badge {
+    font-weight: 700; letter-spacing: 1px; padding: 6px 12px; border-radius: 6px;
+    color: #0b0e13; font-size: 12.5px;
+  }
+  .source-badge {
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px;
+    color: var(--muted); font-size: 12px; white-space: nowrap;
+  }
+  .source-badge.deepseek { border-color: #7b61ff; color: #b8a9ff; }
+  .risk { font-size: 30px; font-weight: 700; }
+  .bar { height: 8px; background: #0c1016; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, #2fbf71, #d9a521, #e5484d); }
+  .muted { color: var(--muted); }
+  .sig { display: grid; grid-template-columns: 150px 1fr 62px; gap: 8px; align-items: center; font-size: 12.5px; margin: 5px 0; }
+  .sig .track { height: 6px; background: #0c1016; border-radius: 3px; overflow: hidden; }
+  .sig .track > i { display: block; height: 100%; background: var(--accent); }
+  .sig .track > i.neg { background: var(--allow); }
+  mark { background: rgba(229, 72, 77, .28); color: #ffd9da; border-bottom: 1px solid #e5484d; border-radius: 2px; }
+  mark.enc { background: rgba(79, 140, 255, .25); color: #cfe0ff; border-color: #4f8cff; }
+  mark.char { background: rgba(180, 107, 220, .3); color: #f0dcff; border-color: #b46bdc; }
+  pre {
+    background: #0c1016; border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px; overflow: auto; font: 12.5px/1.6 ui-monospace, Consolas, monospace;
+    white-space: pre-wrap; word-break: break-word; max-height: 260px;
+  }
+  .kv { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .kv b { color: var(--text); font-weight: 600; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; margin-top: 12px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tabs button { background: #1a2230; color: #8b95a7; }
+  .tabs button.active { background: var(--accent); color: #fff; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>IronGate（铁闸）</h1>
+  <span class="tag">提示注入"信息流"护栏 · 双端守恒 · 零依赖可复现</span>
+</header>
+
+<div class="wrap">
+  <!-- 左：输入 -->
+  <section class="panel">
+    <h2>输入</h2>
+    <textarea id="input" placeholder="粘贴一段待检测的文本，例如来自用户、检索结果或工具返回的内容……"></textarea>
+    <div class="row">
+      <label>来源渠道</label>
+      <select id="channel">
+        <option value="user" selected>用户消息 (trust 0.55)</option>
+        <option value="retrieval">检索结果 (trust 0.15)</option>
+        <option value="tool">工具返回 (trust 0.30)</option>
+        <option value="system">系统提示 (trust 1.00)</option>
+      </select>
+      <label><input type="checkbox" id="conv"> 多轮对话（追踪"埋点—引爆"）</label>
+    </div>
+    <div class="row">
+      <button id="scan">检测</button>
+      <button class="ghost" id="clear">清空</button>
+      <span class="muted" id="status"></span>
+    </div>
+    <div class="examples" id="examples"></div>
+
+    <h2 style="margin-top:22px">输出侧守恒校验</h2>
+    <div class="row">
+      <input type="text" id="canary" placeholder="金丝雀串（系统提示中埋入）" style="flex:1">
+      <input type="text" id="allowed" placeholder="授权能力，如 chat,read" style="flex:1">
+      <input type="text" id="observed" placeholder="实际能力，如 chat,shell" style="flex:1">
+    </div>
+    <pre id="outputText" contenteditable="true" style="margin-top:10px;min-height:70px">这里是模型输出，可直接编辑后校验……</pre>
+    <div class="row"><button class="ghost" id="verify">校验输出</button></div>
+    <div id="outputResult"></div>
+  </section>
+
+  <!-- 右：结果 -->
+  <section class="panel">
+    <h2>判决</h2>
+    <div id="empty" class="muted">尚未检测。点左侧「检测」或选择一个内置样例。</div>
+    <div id="result" class="hidden">
+      <div class="verdict-head">
+        <span class="badge" id="action">ALLOW</span>
+        <span class="risk" id="risk">0.00</span>
+        <span class="source-badge" id="source">规则判定</span>
+        <span class="muted" id="latency"></span>
+      </div>
+      <div class="bar"><i id="riskbar" style="width:0%"></i></div>
+      <p id="explanation" style="margin:12px 0 4px"></p>
+      <div class="kv">
+        <span>模型概率 <b id="prob">-</b></span>
+        <span>权限流 <b id="flow">-</b></span>
+        <span>权限面 <b id="priv">-</b></span>
+        <span>允许能力 <b id="caps">-</b></span>
+      </div>
+
+      <h2 style="margin-top:20px">信号贡献（权重 × 标准化取值）</h2>
+      <div id="signals"></div>
+
+      <h2 style="margin-top:20px">证据高亮</h2>
+      <pre id="evidence"></pre>
+
+      <h2 style="margin-top:16px">净化后文本</h2>
+      <pre id="sanitized"></pre>
+
+      <details>
+        <summary>查看原始 JSON</summary>
+        <pre id="raw"></pre>
+      </details>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ACTION_COLOR = { allow: "var(--allow)", sanitize: "var(--sanitize)",
+                       quarantine: "var(--quarantine)", block: "var(--block)" };
+let conversationId = "demo-" + Math.random().toString(36).slice(2, 8);
+
+async function loadExamples() {
+  const res = await fetch("/api/examples");
+  const data = await res.json();
+  const box = $("examples");
+  box.innerHTML = "";
+  for (const ex of data.examples) {
+    const b = document.createElement("button");
+    b.textContent = ex.title;
+    b.onclick = () => { $("input").value = ex.text; $("channel").value = ex.channel; };
+    box.appendChild(b);
+  }
+}
+
+function highlight(text, evidence) {
+  const spans = evidence.filter(e => e.span && e.span[1] > e.span[0])
+    .map(e => ({ start: e.span[0], end: e.span[1], kind: e.kind }));
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  let html = "", cursor = 0;
+  for (const s of spans) {
+    if (s.start < cursor) continue;
+    const cls = s.kind.startsWith("encoded") ? "enc" : (s.kind.startsWith("char") ? "char" : "");
+    html += escapeHtml(text.slice(cursor, s.start));
+    html += `<mark class="${cls}">${escapeHtml(text.slice(s.start, s.end))}</mark>`;
+    cursor = s.end;
+  }
+  html += escapeHtml(text.slice(cursor));
+  return html;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderSignals(contributions) {
+  const box = $("signals");
+  box.innerHTML = "";
+  const shown = contributions.filter(c => c.value > 0 || c.contribution < -0.05).slice(0, 7);
+  const max = Math.max(0.001, ...shown.map(c => Math.abs(c.contribution)));
+  for (const c of shown) {
+    const row = document.createElement("div");
+    row.className = "sig";
+    const neg = c.contribution < 0;
+    row.innerHTML = `<span class="muted">${c.signal}</span>
+      <span class="track"><i class="${neg ? "neg" : ""}" style="width:${Math.round(Math.abs(c.contribution) / max * 100)}%"></i></span>
+      <span style="text-align:right" class="${neg ? "muted" : ""}">${c.contribution > 0 ? "+" : ""}${c.contribution}</span>`;
+    box.appendChild(row);
+  }
+}
+
+async function scan() {
+  const text = $("input").value.trim();
+  if (!text) { $("status").textContent = "请输入文本"; return; }
+  $("status").textContent = "分析中…";
+  const res = await fetch("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text, channel: $("channel").value,
+      conversation_id: $("conv").checked ? conversationId : ""
+    })
+  });
+  const data = await res.json();
+  $("status").textContent = "";
+  if (data.error) { $("status").textContent = data.error; return; }
+  $("empty").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  const color = ACTION_COLOR[data.action] || "#888";
+  $("action").textContent = data.action.toUpperCase();
+  $("action").style.background = color;
+  $("risk").textContent = data.risk.toFixed(2);
+  $("risk").style.color = color;
+  const fromDeepSeek = data.decision_source === "deepseek";
+  $("source").textContent = fromDeepSeek ? "DeepSeek 判定" : "规则判定";
+  $("source").classList.toggle("deepseek", fromDeepSeek);
+  $("riskbar").style.width = Math.min(100, data.risk * 100) + "%";
+  $("latency").textContent = data.latency_ms.toFixed(1) + " ms";
+  $("explanation").textContent = data.explanation;
+  $("prob").textContent = data.model_prob.toFixed(3);
+  $("flow").textContent = data.flow_score.toFixed(3);
+  $("priv").textContent = "P" + data.flow.max_privilege;
+  $("caps").textContent = data.allowed_capabilities.join(", ") || "—";
+  renderSignals(data.contributions);
+  $("evidence").innerHTML = highlight(text, data.evidence);
+  $("sanitized").textContent = data.sanitized;
+  $("raw").textContent = JSON.stringify(data, null, 2);
+}
+
+async function verifyOutput() {
+  const body = {
+    output: $("outputText").innerText,
+    canary: $("canary").value,
+    allowed: $("allowed").value.split(",").map(s => s.trim()).filter(Boolean),
+    observed: $("observed").value.split(",").map(s => s.trim()).filter(Boolean)
+  };
+  const res = await fetch("/api/scan_output", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  const color = ACTION_COLOR[data.action] || "#888";
+  $("outputResult").innerHTML =
+    `<div class="kv"><span>动作 <b style="color:${color}">${data.action.toUpperCase()}</b></span>
+     <span>风险 <b>${data.risk.toFixed(3)}</b></span>
+     <span>回响 ${data.echo_ratio.toFixed(2)}</span></div>` +
+    (data.notes.length ? `<ul class="muted" style="margin:8px 0 0 16px;font-size:12.5px">${
+      data.notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>` : "");
+}
+
+$("scan").onclick = scan;
+$("verify").onclick = verifyOutput;
+$("clear").onclick = () => { $("input").value = ""; $("outputText").innerText = ""; };
+$("input").addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") scan();
+});
+loadExamples();
+</script>
+</body>
+</html>
