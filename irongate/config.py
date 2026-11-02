@@ -146,7 +146,7 @@ def settings_from_env(environ: Optional[Mapping[str, str]] = None,
     deepseek_api_key = (env.get("DEEPSEEK_API_KEY") or "").strip() or None
     deepseek_base_url = (env.get("DEEPSEEK_BASE_URL") or
                          "https://api.deepseek.com").strip().rstrip("/")
-    deepseek_model = (env.get("DEEPSEEK_MODEL") or "deepseek-v4-flash").strip()
+    deepseek_model = (env.get("DEEPSEEK_MODEL") or "deepseek-flash").strip()
     deepseek_timeout = _as_int(env.get("IRONGATE_DEEPSEEK_TIMEOUT", ""), 20, 1, 120)
     deepseek_min_confidence = _as_float(
         env.get("IRONGATE_DEEPSEEK_MIN_CONFIDENCE", ""), 0.65, 0.5, 1.0)

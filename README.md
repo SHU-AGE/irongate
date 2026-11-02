@@ -94,7 +94,7 @@ python -m irongate config # 打印当前生效值（含 .env 是否被加载）
 | `IRONGATE_DEEPSEEK_ENABLED` | `true` | 是否允许对中间态调用 DeepSeek；没有 Key 时自动退回规则 |
 | `DEEPSEEK_API_KEY` | 空 | DeepSeek API Key，只放在本机 `.env`，不可提交 |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek OpenAI 兼容接口地址 |
-| `DEEPSEEK_MODEL` | `deepseek-v4-flash` | 复核使用的模型 |
+| `DEEPSEEK_MODEL` | `deepseek-flash` | 复核使用的模型 |
 | `IRONGATE_DEEPSEEK_TIMEOUT` | `20` | API 超时秒数 |
 | `IRONGATE_DEEPSEEK_MIN_CONFIDENCE` | `0.65` | 低于此置信度时保留本地规则结果 |
 
