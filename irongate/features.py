@@ -74,6 +74,15 @@ REFUSAL = (
     "not allowed", "never",
 )
 
+# 只是语气/框定、不构成实际指令的言语行为
+_SOFT_ACTS = frozenset({"polite", "framing"})
+
+
+def _is_question(segments, index: int) -> bool:
+    if not 0 <= index < len(segments):
+        return False
+    return any(ch in segments[index].text for ch in "？?")
+
 
 @dataclass
 class Signals:
@@ -109,6 +118,10 @@ def extract(
 
     question_marks = sum(norm.raw.count(ch) for ch in "？?")
     interrogative = min(1.0, question_marks / max(1, len(seg.segments)))
+    # "先问个无关问题？再下指令"：指令不在问句里时，问号不能替它开脱
+    if any(d.act not in _SOFT_ACTS and not _is_question(seg.segments, d.segment_index)
+           for d in flow.directives):
+        interrogative = 0.0
 
     # 标点极少 + 指令词多，是"机器指令串"的典型形状
     density = min(1.0, directive_count / 3.0)
