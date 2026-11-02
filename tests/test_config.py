@@ -71,7 +71,7 @@ class SettingsTests(unittest.TestCase):
         self.assertIsNone(settings.canary)
         self.assertTrue(settings.deepseek_enabled)
         self.assertIsNone(settings.deepseek_api_key)
-        self.assertEqual(settings.deepseek_model, "deepseek-flash")
+        self.assertEqual(settings.deepseek_model, "deepseek-v4-flash")
         self.assertEqual(settings.deepseek_timeout_seconds, 20)
         self.assertEqual(settings.deepseek_min_confidence, 0.65)
 

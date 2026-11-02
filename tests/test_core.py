@@ -128,8 +128,10 @@ class TextNormalizationTests(unittest.TestCase):
         self.assertEqual(norm.count("homoglyph"), 1)
 
     def test_fullwidth_punctuation_is_not_anomaly(self) -> None:
-        norm = normalize("你好，世界：测试。")
-        self.assertEqual(norm.count("fullwidth"), 0)
+        norm = normalize("你好，世界：测试。今天天气怎么样？（真的）！")
+        self.assertEqual(norm.anomalies, [])
+        self.assertEqual(norm.anomaly_ratio, 0.0)
+        self.assertIn("怎么样?(真的)!", norm.folded)
 
     def test_fullwidth_letters_flagged(self) -> None:
         norm = normalize("ＩＧＮＯＲＥ")
