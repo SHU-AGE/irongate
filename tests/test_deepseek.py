@@ -75,6 +75,8 @@ class DeepSeekClientTests(unittest.TestCase):
         request_json = json.loads(opener.request.data)
         self.assertEqual(request_json["response_format"], {"type": "json_object"})
         self.assertEqual(request_json["thinking"], {"type": "disabled"})
+        # confidence 必须说明是"对判断的把握"，否则模型会把它当成注入概率
+        self.assertIn("不是\"文本是注入的概率\"", request_json["messages"][0]["content"])
 
 
 @unittest.skipUnless((ROOT / "artifacts" / "model.json").exists(), "需要模型文件")
