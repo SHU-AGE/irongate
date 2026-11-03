@@ -12,3 +12,5 @@ bench/results.local.json
 .env
 .env.*
 !.env.example
+# 公网演示脚本生成的临时地址
+public_url.txt

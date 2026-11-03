@@ -31,6 +31,7 @@ from .segmenter import Segmentation, segment
 from .textnorm import Normalization, compact_view, normalize
 
 _HIGH_RISK_ACTS = {"override", "authority", "exfil", "capability", "role"}
+_HIDDEN_CHAR_KINDS = {"char:zero_width", "char:bidi", "char:tag"}
 
 
 @dataclass
@@ -193,11 +194,14 @@ class Guard:
 
     def _maybe_consult_deepseek(self, verdict: Verdict, text: str,
                                 channel: str, started: float) -> Verdict:
-        """明确结果直接返回；中间动作才请求 DeepSeek 做第二意见。"""
+        """明确结果直接返回；中间动作、或带隐形字符的放行，才请求 DeepSeek 做第二意见。"""
         judge = self.deepseek_judge
         if verdict.error or judge is None:
             return verdict
-        if verdict.action not in judge.uncertain_actions:
+        # 隐形字符会把单词拆碎、压低本地风险；带隐形字符的"放行"也要请 DeepSeek 复核
+        hidden_chars = verdict.action == "allow" and any(
+            e.kind in _HIDDEN_CHAR_KINDS for e in verdict.evidence)
+        if verdict.action not in judge.uncertain_actions and not hidden_chars:
             verdict.deepseek = {"consulted": False, "reason": "本地规则结果明确"}
             return verdict
         if not judge.configured:
@@ -221,6 +225,7 @@ class Guard:
 
         info = result.as_dict()
         info.update({"consulted": True, "used": False,
+                     "trigger": "hidden_chars" if hidden_chars else "uncertain",
                      "rule_action": rule_action, "rule_risk": round(rule_risk, 4)})
         verdict.deepseek = info
         if result.confidence < judge.min_confidence:

@@ -96,6 +96,11 @@ def _is_fullwidth_alnum(cp: int) -> bool:
     return (0xFF10 <= cp <= 0xFF19) or (0xFF21 <= cp <= 0xFF3A) or (0xFF41 <= cp <= 0xFF5A)
 
 
+def _is_fullwidth_punct(cp: int) -> bool:
+    """中文正文常用的全角标点（！？：；（）等）：照常折叠成 ASCII 便于匹配，但不记为异常。"""
+    return _FULLWIDTH_LO <= cp <= _FULLWIDTH_HI and not _is_fullwidth_alnum(cp)
+
+
 def _classify(index: int, ch: str) -> CharAnomaly | None:
     cp = ord(ch)
     if cp in ZERO_WIDTH:
@@ -105,6 +110,8 @@ def _classify(index: int, ch: str) -> CharAnomaly | None:
     if cp in TAG_CHARS:
         return CharAnomaly(index, "tag", cp, _KIND_NAMES["tag"])
     low = ch.lower()
+    if _is_fullwidth_punct(cp):
+        return None
     if low in HOMOGLYPH_MAP and HOMOGLYPH_MAP[low] != low:
         return CharAnomaly(index, "homoglyph", cp, _KIND_NAMES["homoglyph"])
     if _is_fullwidth_alnum(cp):
@@ -132,7 +139,8 @@ def normalize(text: str) -> Normalization:
             out.append(chr(cp - 0xFEE0))
             continue
         low = ch.lower()
-        if anomaly is not None and anomaly.kind == "homoglyph":
+        if (anomaly is not None and anomaly.kind == "homoglyph") or (
+                _is_fullwidth_punct(cp) and low in HOMOGLYPH_MAP):
             out.append(HOMOGLYPH_MAP[low])
             continue
         out.append(low if len(low) == 1 else ch)
